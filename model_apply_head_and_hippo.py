@@ -308,7 +308,7 @@ for fname in sys.argv[1:]:
         print(" *** Error: can't open file. Skip")
         continue
 
-    d = img.get_data(caching="unchanged").astype(np.float32)
+    d = img.get_fdata(caching="unchanged", dtype=np.float32)
     while len(d.shape) > 3:
         print("Warning: this looks like a timeserie. Averaging it")
         open(fname + ".warning.txt", "a").write("dim not 3. Averaging last dimension\n")
