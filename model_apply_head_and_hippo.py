@@ -510,30 +510,116 @@ for fname in sys.argv[1:]:
     boxvols = hippoRL[[1,0]].reshape(2, -1).sum(1) * np.abs(np.linalg.det(imgcroproi_affine @ inv(M)))
     scalar_output.append(boxvols)
 
-    # Output hippodeep in native space
-    # native64 space
-    gsx, gsy, gsz = img.shape[:3]
-    # this is a big array, so use int16
-    sgrid = np.rollaxis(np.indices((gsx,gsy,gsz), dtype=np.int16),0,4)
-    
-    wroi = np.linalg.lstsq(bbox_world(imgcroproi_affine, imgcroproi_shape), bbox_one, rcond=None)[0]
-    wgridt = torch.as_tensor(mul_homo(sgrid, (img.affine.T @ M.T @ wroi))[None,...,[2,1,0]], device=device, dtype=torch.float32)
-    del sgrid
+    if 0:
+        # Output hippodeep in native space
+        # native64 space
+        gsx, gsy, gsz = img.shape[:3]
+        # this is a big array, so use int16
+        sgrid = np.rollaxis(np.indices((gsx,gsy,gsz), dtype=np.int16),0,4)
+        
+        wroi = np.linalg.lstsq(bbox_world(imgcroproi_affine, imgcroproi_shape), bbox_one, rcond=None)[0]
+        wgridt = torch.as_tensor(mul_homo(sgrid, (img.affine.T @ M.T @ wroi))[None,...,[2,1,0]], device=device, dtype=torch.float32)
+        del sgrid
 
-    dnat = np.asarray(F.grid_sample(torch.as_tensor(output, dtype=torch.float32, device=device)[None], wgridt, align_corners=True).cpu()[0,:])
+        dnat = np.asarray(F.grid_sample(torch.as_tensor(output, dtype=torch.float32, device=device)[None], wgridt, align_corners=True).cpu()[0,:])
 
-    volsAA = dnat.reshape(2,-1).sum(1) / 255. * np.abs(np.linalg.det(img.affine))
-    scalar_output.append(volsAA)
+        volsAA = dnat.reshape(2,-1).sum(1) / 255. * np.abs(np.linalg.det(img.affine))
+        scalar_output.append(volsAA)
 
-    volsAA = (dnat * (dnat > 32)).reshape(2,-1).sum(1) / 255. * np.abs(np.linalg.det(img.affine))
-    print(" Hippocampal volumes (L,R)", volsAA)
-    scalar_output.append(volsAA)
-    scalar_output_report.append(volsAA)
+        volsAA = (dnat * (dnat > 32)).reshape(2,-1).sum(1) / 255. * np.abs(np.linalg.det(img.affine))
+        print(" Hippocampal volumes (L,R)", volsAA)
+        scalar_output.append(volsAA)
+        scalar_output_report.append(volsAA)
 
 
-    dnat[dnat < 32] = 0 # remove noise
-    nibabel.Nifti1Image(dnat[0].astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_L"))
-    nibabel.Nifti1Image(dnat[1].astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_R"))
+        dnat[dnat < 32] = 0 # remove noise
+        nibabel.Nifti1Image(dnat[0].astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_L"))
+        nibabel.Nifti1Image(dnat[1].astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_R"))
+
+    else:
+        mul_homo = lambda g, Mt : g @ Mt[:3,:3].astype(np.float32) + Mt[3,:3].astype(np.float32)
+
+        def bbox_xyz(shape, affine):
+            " returns the worldspace of the edge of the image "
+            s = shape[0]-1, shape[1]-1, shape[2]-1
+            bbox = [[0,0,0], [s[0],0,0], [0,s[1],0], [0,0,s[2]], [s[0],s[1],0], [s[0],0,s[2]], [0,s[1],s[2]], [s[0],s[1],s[2]]]
+            return mul_homo(bbox, affine.T)
+
+        def indices_xyz(shape, affine, offset_vox= np.array([0,0,0])):
+            assert (len(shape) == 3)
+            ind = np.indices(shape).astype(np.float32) + offset_vox.reshape(3, 1,1,1).astype(np.float32)
+            return mul_homo(np.rollaxis(ind, 0, 4), affine.T)
+
+        def xyz_to_ijk(xyz, iaffine):
+            affine = np.linalg.inv(iaffine)
+            return np.rollaxis(mul_homo(xyz, affine.T), 3, 0)
+
+        pts = bbox_xyz(imgcroproi_shape, imgcroproi_affine)
+        pts = mul_homo(pts, np.linalg.inv(M).T)
+        pts_ijk = mul_homo(pts, np.linalg.inv(img.affine).T)
+        for i in range(3):
+            np.clip(pts_ijk[:,i], 0, img.shape[i], out = pts_ijk[:,i])
+        pmin = np.floor(np.min(pts_ijk, 0)).astype(int)
+        pwidth = np.ceil(np.max(pts_ijk, 0)).astype(int) - pmin
+
+        widx = indices_xyz(pwidth, img.affine, offset_vox=pmin)
+
+        widx = mul_homo(widx, M.T)
+
+        if 1:
+            print("Using scipy grid sample")
+            ijk = xyz_to_ijk(widx, imgcroproi_affine)
+            wdata = np.zeros(img.shape, np.uint8)
+            
+            dnat = scipy.ndimage.map_coordinates(output[0], ijk, order=1, output=np.float32)
+            dnat[dnat < 32] = 0 # remove noise
+            volsAA_L = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
+            wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
+            nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_L"))
+
+            dnat = scipy.ndimage.map_coordinates(output[1], ijk, order=1, output=np.float32)
+            dnat[dnat < 32] = 0 # remove noise
+            volsAA_R = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
+            wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
+            nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_R"))
+
+        else:
+            print("Using pytorch grid_sample")
+            def xyz_to_DHW3(xyz, iaffine, srcshape):
+                affine = np.linalg.inv(iaffine)
+                ijk3 = mul_homo(xyz, affine.T)
+                ijk3[...,0] /= srcshape[0] -1
+                ijk3[...,1] /= srcshape[1] -1
+                ijk3[...,2] /= srcshape[2] -1
+                ijk3 = ijk3 * 2 - 1
+                DHW3 = np.swapaxes(ijk3, 0, 2)
+                return DHW3
+
+            wdata = np.zeros(img.shape, np.uint8)
+            # Pytorch: DHW=kji
+            DHW3 = xyz_to_DHW3(widx, imgcroproi_affine, imgcroproi_shape)
+
+            d = torch.tensor(output[0].T, dtype=torch.float32)
+            outDHW = F.grid_sample(d[None,None], torch.tensor(DHW3[None]), align_corners=True)
+            dnat = np.asarray(outDHW[0,0].T)
+            dnat[dnat < 32] = 0 # remove noise
+            volsAA_L = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
+            wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
+            nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_L"))
+
+            d = torch.tensor(output[1].T, dtype=torch.float32)
+            outDHW = F.grid_sample(d[None,None], torch.tensor(DHW3[None]), align_corners=True)
+            dnat = np.asarray(outDHW[0,0].T)
+            dnat[dnat < 32] = 0 # remove noise
+            volsAA_R = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
+            wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
+            nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_R"))
+
+        #scalar_output.append([volsAA_L, volsAA_R])
+
+        print(" Hippocampal volumes (L,R)", volsAA_L, volsAA_R)
+        scalar_output.append([volsAA_L, volsAA_R])
+        scalar_output_report.append([volsAA_L, volsAA_R])
 
 
     if OUTPUT_DEBUG:
