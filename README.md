@@ -29,11 +29,26 @@ The simplest way to install from scratch is maybe to use a Anaconda environment,
 * install scipy (`conda install scipy` or `pip install scipy`) and  nibabel (`pip install nibabel`)
 * get pytorch for python from `https://pytorch.org/get-started/locally/`. CUDA is not necessary.
 
+## Windows Installation
+
+* pip install numpy scipy nibabel
+* pip install torch==1.3.0+cpu -f https:&#8203;//download.pytorch.org/whl/torch_stable.html
+* pip install psutil pywin32
+
+to compile an executable:
+
+* pip install pyinstaller
+* pyinstaller HippoDeep.spec
+* ---> find your executable under .\dist\HippoDeep.exe
 
 ## Usage:
 To use the program, simply call:
 
 `deepseg1.sh example_brain_t1.nii.gz`.
+
+if called without argument a file dialougue should appear
+<br/>
+(this is, if you have tkinter installed with: "yum install tkinter" or "apt-get install python3-tk")
 
 To process multiple subjects, pass them as multiple arguments.
 `deepseg1.sh subject_*.nii.gz`.

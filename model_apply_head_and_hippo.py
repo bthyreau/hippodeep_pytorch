@@ -6,7 +6,9 @@ import scipy.ndimage
 import torch.nn as nn
 import torch.nn.functional as F
 from numpy.linalg import inv
-import resource
+if sys.platform=="win32": import psutil # this works for Windows
+else: import resource # Unix specific package, does not exist for Windoze
+from GetFilename import GetFilename
 
 # monkey-patch for back-compatibility with older (~1.0.0) torch
 import inspect
@@ -15,6 +17,8 @@ if not "align_corners" in inspect.signature(F.grid_sample).parameters:
     F.grid_sample = lambda *x, **k : old_grid_sample(*x)
 
 if len(sys.argv[1:]) == 0:
+  try: sys.argv.append(GetFilename())
+  except:
     print("Need to pass one or more T1 image filename as argument")
     sys.exit(1)
 
@@ -177,16 +181,17 @@ np.array([[  -2.85714293,   -0.        ,    0.        ,   90.        ],
           [   0.        ,    0.        ,    0.        ,    1.        ]])
 
 
-scriptpath = os.path.dirname(os.path.realpath(__file__))
+try: scriptpath = sys._MEIPASS # when running frozen with pyInstaller 
+except: scriptpath = os.path.dirname(os.path.realpath(__file__))
 
 device = torch.device("cpu")
 net = HeadModel()
 net.to(device)
-net.load_state_dict(torch.load(scriptpath + "/torchparams/params_head_00075_00000.pt", map_location=device))
+net.load_state_dict(torch.load(os.path.normpath(scriptpath + "/torchparams/params_head_00075_00000.pt"), map_location=device))
 net.eval()
 
 netAff = ModelAff()
-netAff.load_state_dict(torch.load(scriptpath + "/torchparams/paramsaffineta_00079_00000.pt", map_location=device), strict=False)
+netAff.load_state_dict(torch.load(os.path.normpath(scriptpath + "/torchparams/paramsaffineta_00079_00000.pt"), map_location=device), strict=False)
 netAff.to(device)
 netAff.eval()
 
@@ -593,7 +598,10 @@ for fname in sys.argv[1:]:
     allsubjects_scalar_report.append( (fname, scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1]) )
 
 if 1: #OUTPUT_DEBUG:
-    print("Peak memory used (Gb) " + str(resource.getrusage(resource.RUSAGE_SELF)[2] / (1024.*1024)))
+  if sys.platform=="win32":
+    print("Peak memory used (Gb) " + str(round(psutil.Process().memory_info().peak_wset/ (1024.*1024*1024),2)))
+  else:
+    print("Peak memory used (Gb) " + str(round(resource.getrusage(resource.RUSAGE_SELF)[2] / (1024.*1024),2)))
 
 print("Done")
 
@@ -602,3 +610,7 @@ if len(sys.argv[1:]) > 1:
     txt_entries = ["%s,%4f,%4f,%4f\n" % s for s in allsubjects_scalar_report]
     open(outfilename, "w").writelines( [ "filename,eTIV,hippoL,hippoR\n" ] + txt_entries)
     print("Volumes of every subjects saved as " + outfilename)
+
+#pause for windows to be able to see messages
+if sys.platform=="win32": os.system("pause") # windows
+  
