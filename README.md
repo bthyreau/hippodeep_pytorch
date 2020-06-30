@@ -17,7 +17,7 @@ This program requires Python 3, with the PyTorch library, version > 1.0.0.
 
 No GPU is required
 
-Tested on Linux CentOS 6.x/7.x, Ubuntu 18.04 and MacOS X 10.13, using PyTorch versions 1.0.0 to 1.4.0
+Tested on Linux CentOS 6.x/7.x, Ubuntu 18.04 and MacOS X 10.13, using PyTorch versions 1.0.0 to 1.4.0. In addition, Windows compatibility patches by Bernd Foerster are available at https://github.com/bfoe/hippodeep_pytorch
 
 ## Installation
 
