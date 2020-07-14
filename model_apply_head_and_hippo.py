@@ -548,7 +548,7 @@ for fname in sys.argv[1:]:
 
         DHW3 = xyz_to_DHW3(widx, imgcroproi_affine, imgcroproi_shape)
 
-        wdata = np.zeros(img.shape, np.uint8)
+        wdata = np.zeros(img.shape[:3], np.uint8)
 
 
         d = torch.tensor(output[0].T, dtype=torch.float32)
