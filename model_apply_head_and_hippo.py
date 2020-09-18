@@ -295,14 +295,24 @@ for fname in sys.argv[1:]:
     Ti = time.time()
     try:
         print("Loading image " + fname)
-        outfilename = fname.replace(".mnc", ".nii").replace(".nii.gz", ".nii").replace(".nii", "_tiv.nii.gz")
+        outfilename = fname.replace(".mnc", ".nii").replace(".mgz", ".nii").replace(".nii.gz", ".nii").replace(".nii", "_tiv.nii.gz")
         img = nibabel.load(fname)
 
-        if img.header["qform_code"] == 0:
-            print(" *** Error: the header of this nifti file has no qform_code defined.")
-            print(" Fix the header manually or reconvert from the original DICOM.")
-            if not OUTPUT_DEBUG:
-                continue
+        if type(img) is nibabel.nifti1.Nifti1Image:
+            img._affine = img.get_qform() # for ANTs compatibility
+
+        if type(img) is nibabel.Nifti1Image:
+            if img.header["qform_code"] == 0:
+                if img.header["sform_code"] == 0:
+                    print(" *** Error: the header of this nifti file has no qform_code defined.")
+                    print(" Fix the header manually or reconvert from the original DICOM.")
+                    if not OUTPUT_DEBUG:
+                        continue
+
+            if not np.allclose(img.get_sform(), img.get_qform()):
+                img._affine = img.get_qform() # simplify later ANTs compatibility
+                print("This image has an sform defined, ignoring it - work in scanner space using the qform")
+
     except:
         open(fname + ".warning.txt", "a").write("can't open the file\n")
         print(" *** Error: can't open file. Skip")
@@ -382,7 +392,7 @@ for fname in sys.argv[1:]:
         scalar_output.append(vol)
         del dnat
 
-    if 0:
+    if 1:
         # cerebrum mask
         output = out1[0,2].astype("float32")
     
@@ -573,8 +583,8 @@ for fname in sys.argv[1:]:
 
 
     if OUTPUT_DEBUG:
-        txt = "eTIV_mni,eTIV,cerebrum_mni,cerebrum,mni_hippoL,mni_hippoR,nat_hippoL,nat_hippoR,hippoL,hippoR\n"
-        txt += "%4f,%4f,%4f,%4f,%4.4f,%4.4f,%4.4f,%4.4f,%4.4f,%4.4f\n" % (tuple(scalar_output[:4]) + tuple(scalar_output[4])+ tuple(scalar_output[5])+ tuple(scalar_output[6]))
+        txt = "eTIV_mni,eTIV,cerebrum_mni,cerebrum,mni_hippoL,mni_hippoR,hippoL,hippoR\n"
+        txt += "%4f,%4f,%4f,%4f,%4.4f,%4.4f,%4.4f,%4.4f\n" % (tuple(scalar_output[:4]) + tuple(scalar_output[4])+ tuple(scalar_output[5]))
         open(outfilename.replace("_tiv.nii.gz", "_scalars_hippo.csv"), "w").write(txt)
 
     if 1:
