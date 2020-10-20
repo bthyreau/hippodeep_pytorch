@@ -390,6 +390,7 @@ for fname in sys.argv[1:]:
         vol = (dnat > .5).sum() * np.abs(np.linalg.det(img.affine))
         print(" Estimated intra-cranial volume (mm^3) (native space): %d" % vol)
         scalar_output.append(vol)
+        scalar_output_report[-1] = vol # authoritative, so overwrite previous
         del dnat
 
     if 1:
