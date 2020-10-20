@@ -494,13 +494,11 @@ for fname in sys.argv[1:]:
     d_in -= d_in.mean()
     d_in /= d_in.std()
     # split Left and Right (flipping Right)
-    d_in = np.vstack([d_in[None, None, 6: 54:+1,: ,2:-2 ], d_in[None, None,-7:-55:-1,: ,2:-2 ]])
-
-    d_in = torch.as_tensor(d_in.copy())
-    T = time.time()
     with torch.no_grad():
-        hippoRL = hipponet(d_in)
-    hippoRL = np.asarray(hippoRL.cpu())
+        hippoR = hipponet(torch.as_tensor(d_in[None, None, 6: 54:+1,: ,2:-2 ].copy()))
+        hippoL = hipponet(torch.as_tensor(d_in[None, None,-7:-55:-1,: ,2:-2 ].copy()))
+
+    hippoRL = np.vstack([np.asarray(hippoR.cpu()), np.asarray(hippoL.cpu())])
     #print("Hippo Inferrence in " + str(time.time() - T))
 
     # smoothly rescale (.5 ~ .75) to (.5 ~ 1.)
