@@ -39,3 +39,6 @@ To process multiple subjects, pass them as multiple arguments.
 `deepseg1.sh subject_*.nii.gz`.
 
 The resulting segmentations should be stored as `example_brain_t1_mask_L.nii.gz` (or R for right) and `example_brain_t1_brain_mask.nii.gz`.  The mask volumes (in mm^3) are stored in a csv file named `example_brain_t1_hippoLR_volumes.csv`.  If more than one input was specified, a summary table named `all_subjects_hippo_report.csv` is created.
+
+## License
+MIT License
