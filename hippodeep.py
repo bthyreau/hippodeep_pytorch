@@ -601,7 +601,8 @@ def main():
         print("fslview %s %s -t .5 &" % (outfilename.replace("_tiv", "_affcrop"), outfilename.replace("_tiv", "_affcrop_outseg_mask")))
 
     print(" Elapsed time for subject %4.2fs " % (time.time() - Ti))
-    print(" To display using fslview, try:")
+    print(" To display using fsleyes or fslview, try:")
+    print("  fsleyes %s %s -a 75 -cm Red-Yellow %s -a 75 -cm Blue-Lightblue &" % (fname, outfilename.replace("_tiv", "_mask_L"), outfilename.replace("_tiv", "_mask_R")))
     print("  fslview %s %s -t .5 %s -t .5 &" % (fname, outfilename.replace("_tiv", "_mask_L"), outfilename.replace("_tiv", "_mask_R")))
 
 
