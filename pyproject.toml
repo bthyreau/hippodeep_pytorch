@@ -1,0 +1,26 @@
+[project]
+name = "hippodeep"
+version="1.0"
+requires-python=">=3.8"
+description="quick segmentation of the hippocampus from T1 MRI images"
+dependencies = [
+  "torch",
+  "nibabel",
+  "scipy"
+]
+
+[python.pip]
+extra-index-urls = ["https://download.pytorch.org/whl/cpu"]
+
+[project.scripts]
+hippodeep = "hippodeep:main"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cpu" },
+]
