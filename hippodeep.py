@@ -6,13 +6,19 @@ import scipy.ndimage
 import torch.nn as nn
 import torch.nn.functional as F
 from numpy.linalg import inv
-import resource
+try:
+ import resource
+except:
+ pass
 
 # monkey-patch for back-compatibility with older (~1.0.0) torch
-import inspect
-if not "align_corners" in inspect.signature(F.grid_sample).parameters:
+try:
+ import inspect
+ if not "align_corners" in inspect.signature(F.grid_sample).parameters:
     old_grid_sample = torch.nn.functional.grid_sample
     F.grid_sample = lambda *x, **k : old_grid_sample(*x)
+except:
+    pass
 
 if len(sys.argv[1:]) == 0:
     print("Need to pass one or more T1 image filename as argument")
@@ -291,7 +297,8 @@ def indices_unitary(dimensions, dtype):
         res[i] = np.linspace(-1, 1, dim, dtype=dtype).reshape( shape[:i] + (dim,) + shape[i+1:]  )
     return res
 
-for fname in sys.argv[1:]:
+def main():
+  for fname in sys.argv[1:]:
     Ti = time.time()
     try:
         print("Loading image " + fname)
@@ -520,7 +527,6 @@ for fname in sys.argv[1:]:
     scalar_output.append(boxvols)
 
     if 1:
-        mul_homo = lambda g, Mt : g @ Mt[:3,:3].astype(np.float32) + Mt[3,:3].astype(np.float32)
 
         def bbox_xyz(shape, affine):
             " returns the worldspace of the edge of the image "
@@ -562,7 +568,7 @@ for fname in sys.argv[1:]:
 
         d = torch.tensor(output[0].T, dtype=torch.float32)
         outDHW = F.grid_sample(d[None,None], torch.tensor(DHW3[None]), align_corners=True)
-        dnat = np.asarray(outDHW[0,0].T)
+        dnat = np.asarray(outDHW[0,0].permute(2,1,0))
         dnat[dnat < 32] = 0 # remove noise
         volsAA_L = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
         wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
@@ -570,7 +576,7 @@ for fname in sys.argv[1:]:
 
         d = torch.tensor(output[1].T, dtype=torch.float32)
         outDHW = F.grid_sample(d[None,None], torch.tensor(DHW3[None]), align_corners=True)
-        dnat = np.asarray(outDHW[0,0].T)
+        dnat = np.asarray(outDHW[0,0].permute(2,1,0))
         dnat[dnat < 32] = 0 # remove noise
         volsAA_R = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
         wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
@@ -601,13 +607,18 @@ for fname in sys.argv[1:]:
 
     allsubjects_scalar_report.append( (fname, scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1]) )
 
-if 1: #OUTPUT_DEBUG:
+  try:
     print("Peak memory used (Gb) " + str(resource.getrusage(resource.RUSAGE_SELF)[2] / (1024.*1024)))
+  except:
+    pass
 
-print("Done")
+  print("Done")
 
-if len(sys.argv[1:]) > 1:
+  if len(sys.argv[1:]) > 1:
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
     txt_entries = ["%s,%4f,%4f,%4f\n" % s for s in allsubjects_scalar_report]
     open(outfilename, "w").writelines( [ "filename,eTIV,hippoL,hippoR\n" ] + txt_entries)
     print("Volumes of every subjects saved as " + outfilename)
+
+if __name__ == "__main__":
+    main()
