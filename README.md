@@ -23,7 +23,13 @@ Tested on Linux CentOS 6.x/7.x, Ubuntu 18.04 and MacOS X 10.13, using PyTorch ve
 
 Just clone or download this repository.
 
-In addition to PyTorch, the code requires scipy and nibabel.
+If you have the uv packaging tool ( https://docs.astral.sh/uv/ ), you can do 
+
+`uv run hippodeep.py example_brain_t1.nii.gz`
+
+which should take care of downloading the dependencies in the first run. 
+
+Otherwise, you need to setup a python environment: In addition to PyTorch, the code requires scipy and nibabel.
 
 The simplest way to install from scratch is maybe to use a Anaconda environment, then
 * install scipy (`conda install scipy` or `pip install scipy`) and  nibabel (`pip install nibabel`)
@@ -33,10 +39,12 @@ The simplest way to install from scratch is maybe to use a Anaconda environment,
 ## Usage:
 To use the program, simply call:
 
-`deepseg1.sh example_brain_t1.nii.gz`.
+`./deepseg1.sh example_brain_t1.nii.gz` 
+
+(or alternatively `uv run hippodeep.py example_brain_t1.nii.gz` if you have used the uv method)
 
 To process multiple subjects, pass them as multiple arguments.
-`deepseg1.sh subject_*.nii.gz`.
+`deepseg1.sh subject_*.nii.gz`. (or equivalent with uv run)
 
 The resulting segmentations should be stored as `example_brain_t1_mask_L.nii.gz` (or R for right) and `example_brain_t1_brain_mask.nii.gz`.  The mask volumes (in mm^3) are stored in a csv file named `example_brain_t1_hippoLR_volumes.csv`.  If more than one input was specified, a summary table named `all_subjects_hippo_report.csv` is created.
 
