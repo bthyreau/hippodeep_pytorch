@@ -299,6 +299,9 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
+    if "_mask" in fname:
+        print("Skipping %s because the filename contains _mask in it" % fname)
+        continue
     Ti = time.time()
     try:
         print("Loading image " + fname)
