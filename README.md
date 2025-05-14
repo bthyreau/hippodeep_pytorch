@@ -1,25 +1,25 @@
 # hippodeep
 Brain Hippocampus Segmentation
 
-This program can quickly segment (<1min) the Hippocampus of raw brain T1 images.
+This program segments the Hippocampus of raw brain T1 images in a few seconds.
 
 ![blink_rotated](https://user-images.githubusercontent.com/590921/75311442-1a705a00-589a-11ea-9cb6-d889fb226516.gif)
 
 It relies on a Convolutional Neural Network pre-trained on thousands of images from multiple large cohorts, and is therefore quite robust to subject- and MR-contrast variation.
 For more details on its creation, refer the corresponding manuscript at http://dx.doi.org/10.1016/j.media.2017.11.004
 
-This version is a PyTorch port of the original Theano model. This version has less dependencies and is notably faster thanks to pytorch multithreading. While the hippocampal segmentation model is exactly the same as described in the paper, the pre- and post-processing steps had been improved, and thus, results may slightly differ. The original repo is still available at https://github.com/bthyreau/hippodeep
+This official hippodeep version is a modern PyTorch port of the original Theano version that is technically obsolete. While the hippocampal segmentation model is exactly the same as described in the paper, the pre- and post-processing steps had been improved, and thus, results may differ sligthly. The deprecated theano repo is still available at https://github.com/bthyreau/hippodeep
 
 
 ## Requirement
 
-This program requires Python 3, with the PyTorch library, version > 1.0.0.
+This program requires Python 3 with the PyTorch library.
 
-No GPU is required
+No GPU is required.
 
-Tested on Linux CentOS 6.x/7.x, Ubuntu 18.04 and MacOS X 10.13, using PyTorch versions 1.0.0 to 1.4.0. In addition, Windows compatibility patches by Bernd Foerster are available at https://github.com/bfoe/hippodeep_pytorch
+It should work on most distro and platform that supports pytorch, though mainly tested on Linux CentOS 6.x ~ 8.x, Ubuntu 18.04 ~ 22.04 and MacOS 10.13 ~ 12, using PyTorch versions from 1.0.0 to 2.6.0. 
 
-## Installation
+## Installation and Usage
 
 Just clone or download this repository.
 
@@ -29,22 +29,16 @@ If you have the uv packaging tool ( https://docs.astral.sh/uv/ ), you can do
 
 which should take care of downloading the dependencies in the first run. 
 
-Otherwise, you need to setup a python environment: In addition to PyTorch, the code requires scipy and nibabel.
+Otherwise, you need to configure a python 3 environment on your machine: In addition to PyTorch, the code requires scipy and nibabel. A possible way to install python from scratch is to use Anaconda (anaconda.com) to create an environment, then
+ - install scipy (`conda install scipy` or `pip install scipy`) and  nibabel (`pip install nibabel`)
+ - get pytorch for python from `https://pytorch.org/get-started/locally/`. CUDA is not necessary.
+ - Then, to use the program, call it with `python hippodeep.py example_brain_t1.nii.gz` , possibly changing 'python' to 'python3' depending on your exact setup.
 
-The simplest way to install from scratch is maybe to use a Anaconda environment, then
-* install scipy (`conda install scipy` or `pip install scipy`) and  nibabel (`pip install nibabel`)
-* get pytorch for python from `https://pytorch.org/get-started/locally/`. CUDA is not necessary.
+## Results
 
+To process multiple subjects, pass them as multiple arguments. e.g:
 
-## Usage:
-To use the program, simply call:
-
-`./deepseg1.sh example_brain_t1.nii.gz` 
-
-(or alternatively `uv run hippodeep.py example_brain_t1.nii.gz` if you have used the uv method)
-
-To process multiple subjects, pass them as multiple arguments.
-`deepseg1.sh subject_*.nii.gz`. (or equivalent with uv run)
+`python hippodeep.py subject_*.nii.gz`. (or equivalent with 'uv run')
 
 The resulting segmentations should be stored as `example_brain_t1_mask_L.nii.gz` (or R for right) and `example_brain_t1_brain_mask.nii.gz`.  The mask volumes (in mm^3) are stored in a csv file named `example_brain_t1_hippoLR_volumes.csv`.  If more than one input was specified, a summary table named `all_subjects_hippo_report.csv` is created.
 
