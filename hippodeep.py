@@ -767,7 +767,7 @@ def main():
   print("Done")
 
   if len(sys.argv[1:]) > 1:
-    fname = [x for x in sys.argv[1:] if not x.startswith("-mra")]][-1]
+    fname = [x for x in sys.argv[1:] if not x.startswith("-mra")][-1]
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
     txt_entries = ["%s,%4.0f,%4.0f,%4.0f\n" % s for s in allsubjects_scalar_report]
     txt = "filename,eTIV,hippoL,hippoR\n"
