@@ -375,7 +375,7 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
-    if fname == "-mra":
+    if fname in ["-mra", "-mra-head"]:
         continue
     if "_mask" in fname:
         print("Skipping %s because the filename contains _mask in it" % fname)
@@ -633,7 +633,10 @@ def main():
             output[1, 6: 54:+1,: ,2:-2][2:-2,2:-2,2:-2] = np.clip(hippoRL[0] * 255, 0, 255) # * maskR
 
         elif flipside in "LR":
-            hippoRL = np.vstack([output["R"][0:1,::-1], output["L"][0:1,::+1]])
+            if ("-mra-head" in sys.argv):
+                hippoRL = np.vstack([output["R"][1:2,::-1], output["L"][1:2,::+1]])
+            else:
+                hippoRL = np.vstack([output["R"][0:1,::-1], output["L"][0:1,::+1]])
             output = [hippoRL[1], hippoRL[0]]
 
     if 1:
@@ -733,7 +736,14 @@ def main():
         txt += "%4f,%4f,%4f,%4f,%4.4f,%4.4f,%4.4f,%4.4f\n" % (tuple(scalar_output[:4]) + tuple(scalar_output[4])+ tuple(scalar_output[5]))
         open(outfilename.replace("_tiv.nii.gz", "_scalars_hippo.csv"), "w").write(txt)
 
-    if 1:
+    if "-mra" in sys.argv:
+        if not "-mra-head" in sys.argv:
+           txt = "eTIV,hippoL,hippoR\n"
+        elif "-mra-head" in sys.argv:
+           txt = "eTIV,hippoL_head,hippoR_head\n"
+        txt += "%4.0f,%4.0f,%4.0f\n" % (scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1])
+        open(outfilename.replace("_tiv.nii.gz", "_hippoLR_volumes.csv"), "w").write(txt)
+    else:
         txt = "eTIV,hippoL,hippoR\n"
         txt += "%4.0f,%4.0f,%4.0f\n" % (scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1])
         open(outfilename.replace("_tiv.nii.gz", "_hippoLR_volumes.csv"), "w").write(txt)
@@ -757,10 +767,14 @@ def main():
   print("Done")
 
   if len(sys.argv[1:]) > 1:
+    fname = [x for x in sys.argv[1:] if not x.startswith("-mra")]][-1]
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
     txt_entries = ["%s,%4.0f,%4.0f,%4.0f\n" % s for s in allsubjects_scalar_report]
-    open(outfilename, "w").writelines( [ "filename,eTIV,hippoL,hippoR\n" ] + txt_entries)
-    print("Volumes of every subjects saved as " + outfilename)
+    txt = "filename,eTIV,hippoL,hippoR\n"
+    if "-mra" in sys.argv and "-mra-head" in sys.argv:
+       txt = "filename,eTIV,hippoL_head,hippoR_head\n"
+    open(outfilename, "w").writelines( [ txt ] + txt_entries)
+    print("\nVolumes of every subjects saved as " + outfilename)
 
 if __name__ == "__main__":
     main()
