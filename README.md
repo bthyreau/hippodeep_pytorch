@@ -42,5 +42,16 @@ To process multiple subjects, pass them as multiple arguments. e.g:
 
 The resulting segmentations should be stored as `example_brain_t1_mask_L.nii.gz` (or R for right) and `example_brain_t1_brain_mask.nii.gz`.  The mask volumes (in mm^3) are stored in a csv file named `example_brain_t1_hippoLR_volumes.csv`.  If more than one input was specified, a summary table named `all_subjects_hippo_report.csv` is created.
 
+## MRA image
+Hippodeep has a specific model to process MR Angiography images. Simply adds the "-mra" option on the command line.
+
+Optionally, add the "-mra-head" option to limit the MRA analysis to the hippocampal heads. This may be useful if the hippocampus tail is known to be outside the field of view.
+
+Keep in mind that the eTIV brain size estimate would likely be inaccurate in case of an incomplete brain coverage
+
+
+
 ## License
-MIT License
+Hippodeep is MIT License
+
+For the MRA model: MIT + Attribution clause license

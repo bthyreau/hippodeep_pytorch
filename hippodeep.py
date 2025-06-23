@@ -276,8 +276,84 @@ class HippoModel(nn.Module):
 
         return x
 
-hipponet = HippoModel()
-hipponet.load_state_dict(torch.load(scriptpath + "/torchparams/hippodeep.pt"))
+
+class HippoMRAModel(nn.Module):
+    def __init__(self):
+        super(HippoMRAModel, self).__init__()
+
+        self.block0 = nn.Sequential( nn.Conv3d(1, 32, 3, padding=1),  nn.ELU(), nn.Conv3d(32, 32, 3, padding=1), nn.BatchNorm3d(32), nn.ELU() )
+        self.ma1 = nn.MaxPool3d(2, return_indices=True)
+        self.block1 = nn.Sequential( nn.Conv3d(32, 44, 3, padding=1),  nn.ELU(), nn.Conv3d(44, 44, 3, padding=1), nn.BatchNorm3d(44), nn.ELU() )
+        self.ma2 = nn.MaxPool3d(2, return_indices=True)
+        self.block2 = nn.Sequential( nn.Conv3d(44, 32, 3, padding=1),  nn.ELU(), nn.Conv3d(32, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+        self.ma3 = nn.MaxPool3d(2, return_indices=True)
+        self.block3 = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1),  nn.ELU(), nn.Conv3d(48, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+        self.ma4 = nn.MaxPool3d(2, return_indices=True)
+        self.block4 = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1),  nn.ELU(), nn.Conv3d(48, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+        self.ma5 = nn.MaxPool3d(2, return_indices=True)
+        self.block5 = nn.Sequential( nn.Conv3d(48, 64, 3, padding=1),  nn.ELU(), nn.Conv3d(64, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+
+        self.blockUp4_a = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+        self.blockUp4_b = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1), nn.ELU() )
+        self.blockUp3_a = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+        self.blockUp3_b = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1), nn.ELU() )
+        self.blockUp2_a = nn.Sequential( nn.Conv3d(48, 48, 3, padding=1), nn.BatchNorm3d(48), nn.ELU() )
+        self.blockUp2_b = nn.Sequential( nn.Conv3d(48, 44, 3, padding=1), nn.ELU() )
+        self.blockUp1_a = nn.Sequential( nn.Conv3d(44, 44, 3, padding=1), nn.BatchNorm3d(44), nn.ELU() )
+        self.blockUp1_b = nn.Sequential( nn.Conv3d(44, 32, 3, padding=1), nn.ELU() )
+        self.blockUp0_a = nn.Sequential( nn.Conv3d(32, 32, 3, padding=1), nn.BatchNorm3d(32), nn.ELU() )
+        self.blockUp0_b1 = nn.Sequential( nn.Conv3d(32, 32, 3, padding=1), nn.BatchNorm3d(32), nn.ELU() )
+        self.blockUp0_b2 = nn.Sequential( nn.Conv3d(32, 32, 3, padding=1), nn.ELU() )
+
+        self.conv1x = nn.Conv3d(32, 2, 1, padding=0)
+        self.uma = nn.MaxUnpool3d(2)
+
+    def forward(self, x):
+        self.li0 = x = self.block0(x)
+
+        sh1 = x.shape
+        x, ind1 = self.ma1(x)
+        self.li1 = x = self.block1(x)
+
+        sh2 = x.shape
+        x, ind2 = self.ma2(x)
+        self.li2 = x = self.block2(x)
+
+        sh3 = x.shape
+        x, ind3 = self.ma3(x)
+        self.li3 = x = self.block3(x)
+
+        sh4 = x.shape
+        x, ind4 = self.ma4(x)
+        self.li4 = x = self.block4(x)
+
+        x = self.uma(x, ind4, output_size = sh4)
+        self.lo3 = x = self.blockUp3_a(x)
+        self.lo3a = x = self.blockUp3_b(x + self.li3)
+
+        x = self.uma(x, ind3, output_size = sh3)
+        self.lo2 = x = self.blockUp2_a(x)
+        self.lo2a = x = self.blockUp2_b(x + self.li2)
+
+        x = self.uma(x, ind2, output_size = sh2)
+        self.lo1 = x = self.blockUp1_a(x)
+        self.lo1a = x = self.blockUp1_b(x + self.li1)
+
+        x = self.uma(x, ind1, output_size = sh1)        
+        self.lo0 =  x = self.blockUp0_a(x)
+        self.lo0a = x = self.blockUp0_b1(x + self.li0)
+        self.lo0b = x = self.blockUp0_b2(x)
+
+        x = self.conv1x(x)
+        return torch.sigmoid(x)
+
+if not "-mra" in sys.argv:
+    hipponet = HippoModel()
+    hipponet.load_state_dict(torch.load(scriptpath + "/torchparams/hippodeep.pt"))
+    
+if ("-mra" in sys.argv):
+    hipponet = HippoMRAModel()
+    hipponet.load_state_dict(torch.load(scriptpath + "/torchparams/hippodeep_mra.pt"))
 
 
 OUTPUT_RES64 = False
@@ -299,6 +375,8 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
+    if fname in ["-mra", "-mra-head"]:
+        continue
     if "_mask" in fname:
         print("Skipping %s because the filename contains _mask in it" % fname)
         continue
@@ -482,52 +560,88 @@ def main():
 ## Hippodeep
     T = time.time()
 
-    imgcroproi_affine = np.array([[ -1., -0., 0., 54.], [ -0., 1., -0., -59.], [0., 0., 1., -45.], [0., 0., 0., 1.]])
-    imgcroproi_shape = (107, 72, 68)
-    # coord in mm bbox
-    gsx, gsy, gsz = 107, 72, 68
-    sgrid = np.rollaxis(indices_unitary((gsx,gsy,gsz), dtype=np.float32),0,4)
+    if ("-mra" in sys.argv):
+        # MRA transform is unstable, needs rigid
+        MI = inv(M)
+        u, s, vt = np.linalg.svd(MI[:3,:3])
+        M = inv(np.vstack([np.column_stack([ u @ vt, MI[:3,3]]), [0,0,0,1]]))
 
-    bboxnat = bbox_world(imgcroproi_affine, imgcroproi_shape) @ inv(M.T) @ wnat
-    matzoom = np.linalg.lstsq(bbox_one, bboxnat, rcond=None)[0] # in -1..1 space
-    # wgridt for hippo box
-    wgridt = torch.tensor(mul_homo( sgrid, (matzoom @ revaff1i) )[None,...,[2,1,0]], device=device, dtype=torch.float32)
-    del sgrid
-    dout = F.grid_sample(torch.as_tensor(d, dtype=torch.float32, device=device)[None,None], wgridt, align_corners=True)
-    # note: d was normalized from full-image
-    d_in = np.asarray(dout[0,0].cpu()) # back to numpy since torch does not support negative step/strides
+    output = {}
+    for flipside in ("LR" if ("-mra" in sys.argv) else "B"):
 
-    if OUTPUT_RES64:
-        d_in_u8 = (((d_in - d_in.min()) / d_in.ptp()) * 255).astype("uint8")
-        nibabel.Nifti1Image(d_in_u8, imgcroproi_affine).to_filename(outfilename.replace("_tiv", "_affcrop"))
+        if flipside == "B":
+            imgcroproi_affine = np.array([[ -1., -0., 0., 54.], [ -0., 1., -0., -59.], [0., 0., 1., -45.], [0., 0., 0., 1.]])
+            imgcroproi_shape = (107, 72, 68)                
+        if flipside == "L":
+            imgcroproi_affine = np.array([[ -0.75, 0., 0.,  11.  ], [0., 0.75, 0., -51.], [ 0., 0., 0.75, -45. ], [ 0., 0.,  0., 1. ]])
+            imgcroproi_shape = (85, 85, 107)
+        if flipside == "R":
+            imgcroproi_affine = np.array([[ -0.75, 0., 0.,  54.  ], [0., 0.75, 0., -51.], [ 0., 0., 0.75, -45. ], [ 0., 0.,  0., 1. ]])
+            imgcroproi_shape = (85, 85, 107)
 
-    d_in -= d_in.mean()
-    d_in /= d_in.std()
-    # split Left and Right (flipping Right)
-    with torch.no_grad():
-        hippoR = hipponet(torch.as_tensor(d_in[None, None, 6: 54:+1,: ,2:-2 ].copy()))
-        hippoL = hipponet(torch.as_tensor(d_in[None, None,-7:-55:-1,: ,2:-2 ].copy()))
+        # coord in mm bbox
+        gsx, gsy, gsz = imgcroproi_shape
+        sgrid = np.rollaxis(indices_unitary((gsx,gsy,gsz), dtype=np.float32),0,4)
 
-    hippoRL = np.vstack([np.asarray(hippoR.cpu()), np.asarray(hippoL.cpu())])
-    #print("Hippo Inferrence in " + str(time.time() - T))
+       
+        bboxnat = bbox_world(imgcroproi_affine, imgcroproi_shape) @ inv(M.T) @ wnat
+        matzoom = np.linalg.lstsq(bbox_one, bboxnat, rcond=None)[0] # in -1..1 space
+        wgridt = torch.tensor(mul_homo( sgrid, (matzoom @ revaff1i) )[None,...,[2,1,0]], device=device, dtype=torch.float32)
+        dout = F.grid_sample(torch.as_tensor(d, dtype=torch.float32, device=device)[None,None], wgridt, align_corners=True)
+        # note: d was normalized from full-image # TODO: check that
+        d_in = np.asarray(dout[0,0].cpu()) # back to numpy since torch does not support negative step/strides
 
-    # smoothly rescale (.5 ~ .75) to (.5 ~ 1.)
-    hippoRL = np.clip(((hippoRL - .5) * 2 + .5), 0, 1) * (hippoRL > .5)
-    # lots numpy/torch copy below, because torch raises errors on negative strides
-    output = np.zeros((2, 107, 72, 68), np.float32)
-    output[0, -7:-55:-1,: ,2:-2][2:-2,2:-2,2:-2] = np.clip(hippoRL[1] * 255, 0, 255)#* maskL
-    output[1, 6: 54:+1,: ,2:-2][2:-2,2:-2,2:-2] = np.clip(hippoRL[0] * 255, 0, 255) # * maskR
+        if OUTPUT_RES64:
+            d_in_u8 = (((d_in - d_in.min()) / np.ptp(d_in)) * 255).astype("uint8")            
+            nibabel.Nifti1Image(d_in_u8, imgcroproi_affine).to_filename(outfilename.replace("_tiv", f"_affcrop{flipside}"))
 
-    if OUTPUT_DEBUG:
-        #outputfn = outfilename.replace(".nii.gz", "_outseg_L.nii.gz")
-        #nibabel.Nifti1Image(output[0], imgcroproi_affine).to_filename(outputfn)
-        #outputfn = outfilename.replace(".nii.gz", "_outseg_R.nii.gz")
-        #nibabel.Nifti1Image(output[1], imgcroproi_affine).to_filename(outputfn)
-        outputfn = outfilename.replace("_tiv", "_affcrop_outseg_mask")
-        nibabel.Nifti1Image(output.sum(0), imgcroproi_affine).to_filename(outputfn)
+        d_in -= d_in.mean()
+        d_in /= d_in.std()
 
-    boxvols = hippoRL[[1,0]].reshape(2, -1).sum(1) * np.abs(np.linalg.det(imgcroproi_affine @ inv(M)))
-    scalar_output.append(boxvols)
+        if flipside == "B":
+            with torch.no_grad():
+                hippoR = hipponet(torch.as_tensor(d_in[None, None, 6: 54:+1,: ,2:-2 ].copy()))
+                hippoL = hipponet(torch.as_tensor(d_in[None, None,-7:-55:-1,: ,2:-2 ].copy()))
+            hippoRL = np.vstack([np.asarray(hippoR.cpu()), np.asarray(hippoL.cpu())])
+            # smoothly rescale (.5 ~ .75) to (.5 ~ 1.)
+            hippoRL = np.clip(((hippoRL - .5) * 2 + .5), 0, 1) * (hippoRL > .5)
+            output[flipside] = hippoRL
+
+        elif flipside in "LR":
+            with torch.no_grad():
+                if flipside == "L":
+                    hippo = hipponet(torch.as_tensor(d_in[None, None, ::+1 ].copy()))
+                if flipside == "R":
+                    hippo = hipponet(torch.as_tensor(d_in[None, None, ::-1 ].copy()))
+
+            kd = np.asarray(hippo[0].cpu())
+            labeled = scipy.ndimage.label((kd[0] > .375))[0]
+            largest_cc = labeled == np.argmax(np.bincount(labeled.ravel())[1:]) + 1
+            mask_in = scipy.ndimage.gaussian_filter(largest_cc.astype(np.float32), sigma=1.) > .1
+            kd = (kd * (256/.75) * (mask_in) * (kd >= .375)).clip(0, 255)      
+            if OUTPUT_RES64:
+                nibabel.Nifti1Image(np.rollaxis(kd.astype(np.uint8),0,4), img.affine ).to_filename(fname.replace(".nii.gz", f"_segHBT_{flipside}.nii.gz"))
+            output[flipside] = kd
+       
+    if 1:
+        # Merge sides
+        if flipside == "B":
+            hippoRL = output[flipside]
+            # lots numpy/torch copy below, because torch raises errors on negative strides
+            output = np.zeros((2, 107, 72, 68), np.float32)
+            output[0, -7:-55:-1,: ,2:-2][2:-2,2:-2,2:-2] = np.clip(hippoRL[1] * 255, 0, 255)#* maskL
+            output[1, 6: 54:+1,: ,2:-2][2:-2,2:-2,2:-2] = np.clip(hippoRL[0] * 255, 0, 255) # * maskR
+
+        elif flipside in "LR":
+            if ("-mra-head" in sys.argv):
+                hippoRL = np.vstack([output["R"][1:2,::-1], output["L"][1:2,::+1]])
+            else:
+                hippoRL = np.vstack([output["R"][0:1,::-1], output["L"][0:1,::+1]])
+            output = [hippoRL[1], hippoRL[0]]
+
+    if 1:
+        boxvols = hippoRL[[1,0]].reshape(2, -1).sum(1) * np.abs(np.linalg.det(imgcroproi_affine @ inv(M)))
+        scalar_output.append(boxvols)     
 
     if 1:
 
@@ -552,6 +666,9 @@ def main():
             DHW3 = np.swapaxes(ijk3, 0, 2)
             return DHW3
 
+    if ("-mra" in sys.argv):
+        imgcroproi_affine = np.array([[ -0.75, 0., 0.,  11.  ], [0., 0.75, 0., -51.], [ 0., 0., 0.75, -45. ], [ 0., 0.,  0., 1. ]])
+    if 1:
         pts = bbox_xyz(imgcroproi_shape, imgcroproi_affine)
         pts = mul_homo(pts, np.linalg.inv(M).T)
         pts_ijk = mul_homo(pts, np.linalg.inv(img.affine).T)
@@ -567,16 +684,40 @@ def main():
         DHW3 = xyz_to_DHW3(widx, imgcroproi_affine, imgcroproi_shape)
 
         wdata = np.zeros(img.shape[:3], np.uint8)
+        del pts, pts_ijk
+        del widx
 
-
+    if 1:        
         d = torch.tensor(output[0].T, dtype=torch.float32)
         outDHW = F.grid_sample(d[None,None], torch.tensor(DHW3[None]), align_corners=True)
         dnat = np.asarray(outDHW[0,0].permute(2,1,0))
         dnat[dnat < 32] = 0 # remove noise
         volsAA_L = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
         wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
-        nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_L"))
+        nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", f"_mask_L"))
 
+    if ("-mra" in sys.argv):
+        imgcroproi_affine = np.array([[ -0.75, 0., 0.,  54.  ], [0., 0.75, 0., -51.], [ 0., 0., 0.75, -45. ], [ 0., 0.,  0., 1. ]])
+
+        pts = bbox_xyz(imgcroproi_shape, imgcroproi_affine)
+        pts = mul_homo(pts, np.linalg.inv(M).T)
+        pts_ijk = mul_homo(pts, np.linalg.inv(img.affine).T)
+        for i in range(3):
+            np.clip(pts_ijk[:,i], 0, img.shape[i], out = pts_ijk[:,i])
+        pmin = np.floor(np.min(pts_ijk, 0)).astype(int)
+        pwidth = np.ceil(np.max(pts_ijk, 0)).astype(int) - pmin
+
+        widx = indices_xyz(pwidth, img.affine, offset_vox=pmin)
+
+        widx = mul_homo(widx, M.T)
+
+        DHW3 = xyz_to_DHW3(widx, imgcroproi_affine, imgcroproi_shape)
+
+        wdata = np.zeros(img.shape[:3], np.uint8)
+        del pts, pts_ijk
+        del widx
+
+    if 1:
         d = torch.tensor(output[1].T, dtype=torch.float32)
         outDHW = F.grid_sample(d[None,None], torch.tensor(DHW3[None]), align_corners=True)
         dnat = np.asarray(outDHW[0,0].permute(2,1,0))
@@ -595,9 +736,16 @@ def main():
         txt += "%4f,%4f,%4f,%4f,%4.4f,%4.4f,%4.4f,%4.4f\n" % (tuple(scalar_output[:4]) + tuple(scalar_output[4])+ tuple(scalar_output[5]))
         open(outfilename.replace("_tiv.nii.gz", "_scalars_hippo.csv"), "w").write(txt)
 
-    if 1:
+    if "-mra" in sys.argv:
+        if not "-mra-head" in sys.argv:
+           txt = "eTIV,hippoL,hippoR\n"
+        elif "-mra-head" in sys.argv:
+           txt = "eTIV,hippoL_head,hippoR_head\n"
+        txt += "%4.0f,%4.0f,%4.0f\n" % (scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1])
+        open(outfilename.replace("_tiv.nii.gz", "_hippoLR_volumes.csv"), "w").write(txt)
+    else:
         txt = "eTIV,hippoL,hippoR\n"
-        txt += "%4f,%4f,%4f\n" % (scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1])
+        txt += "%4.0f,%4.0f,%4.0f\n" % (scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1])
         open(outfilename.replace("_tiv.nii.gz", "_hippoLR_volumes.csv"), "w").write(txt)
 
     if OUTPUT_RES64:
@@ -619,10 +767,14 @@ def main():
   print("Done")
 
   if len(sys.argv[1:]) > 1:
+    fname = [x for x in sys.argv[1:] if not x.startswith("-mra")][-1]
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
-    txt_entries = ["%s,%4f,%4f,%4f\n" % s for s in allsubjects_scalar_report]
-    open(outfilename, "w").writelines( [ "filename,eTIV,hippoL,hippoR\n" ] + txt_entries)
-    print("Volumes of every subjects saved as " + outfilename)
+    txt_entries = ["%s,%4.0f,%4.0f,%4.0f\n" % s for s in allsubjects_scalar_report]
+    txt = "filename,eTIV,hippoL,hippoR\n"
+    if "-mra" in sys.argv and "-mra-head" in sys.argv:
+       txt = "filename,eTIV,hippoL_head,hippoR_head\n"
+    open(outfilename, "w").writelines( [ txt ] + txt_entries)
+    print("\nVolumes of every subjects saved as " + outfilename)
 
 if __name__ == "__main__":
     main()
