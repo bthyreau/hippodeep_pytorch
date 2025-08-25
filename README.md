@@ -29,6 +29,8 @@ If you have the uv packaging tool ( https://docs.astral.sh/uv/ ), you can do
 
 which should take care of downloading the dependencies in the first run. 
 
+You can optionally call the deepseg1.sh script or symlink it somewhere in your $PATH
+
 Otherwise, you need to configure a python 3 environment on your machine: In addition to PyTorch, the code requires scipy and nibabel. A possible way to install python from scratch is to use Anaconda (anaconda.com) to create an environment, then
  - install scipy (`conda install scipy` or `pip install scipy`) and  nibabel (`pip install nibabel`)
  - get pytorch for python from `https://pytorch.org/get-started/locally/`. CUDA is not necessary.
@@ -38,7 +40,7 @@ Otherwise, you need to configure a python 3 environment on your machine: In addi
 
 To process multiple subjects, pass them as multiple arguments. e.g:
 
-`python hippodeep.py subject_*.nii.gz`. (or equivalent with 'uv run')
+`deepseg1.sh subject_*.nii.gz`. (or equivalent with 'uv run')
 
 The resulting segmentations should be stored as `example_brain_t1_mask_L.nii.gz` (or R for right) and `example_brain_t1_brain_mask.nii.gz`.  The mask volumes (in mm^3) are stored in a csv file named `example_brain_t1_hippoLR_volumes.csv`.  If more than one input was specified, a summary table named `all_subjects_hippo_report.csv` is created.
 

@@ -1,2 +1,4 @@
-PATH=$(dirname $0)/.venv/bin/:$(dirname $0)/venv/bin/:$PATH
-python3 $(dirname $0)/hippodeep.py $@
+#!/bin/bash
+r0=$(realpath $0)
+PATH=$(dirname $r0)/.venv/bin/:$(dirname $r0)/venv/bin/:$PATH
+python3 $(dirname $r0)/hippodeep.py $@
