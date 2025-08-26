@@ -22,12 +22,21 @@ except:
 
 if len(sys.argv[1:]) == 0:
     print("Need to pass one or more T1 image filename as argument")
+    print("""Options:
+    -mra : use the MRA Angiography model
+    -mra-head : in MRA mode, only segments the hippocampal head
+    -thumb-plain      : Generates some pictures with black background
+    -thumb-circle-jpg :      ... with circle + white background
+    -thumb-circle-png :      ... with circle + transparent background """)
+
     sys.exit(1)
 
 print("Using all available CPU threads")
 if 0: # otherwise, set a limit (useful for running multiple instances)
     torch.set_num_threads(4)
 
+if any([x.startswith("-thumb") for x in sys.argv[1:]]):
+    import screenshot_circle
 
 class HeadModel(nn.Module):
     def __init__(self):
@@ -375,7 +384,7 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
-    if fname in ["-mra", "-mra-head", "-out-regmat"]:
+    if fname in ["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg"]:
         continue
     if "_mask" in fname:
         print("Skipping %s because the filename contains _mask in it" % fname)
@@ -695,6 +704,7 @@ def main():
         volsAA_L = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
         wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
         nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", f"_mask_L"))
+        dnatL = dnat.astype(np.uint8).copy() # keep for screenshot
 
     if ("-mra" in sys.argv):
         imgcroproi_affine = np.array([[ -0.75, 0., 0.,  54.  ], [0., 0.75, 0., -51.], [ 0., 0., 0.75, -45. ], [ 0., 0.,  0., 1. ]])
@@ -725,6 +735,7 @@ def main():
         volsAA_R = dnat.sum() / 255. * np.abs(np.linalg.det(img.affine))
         wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
         nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", "_mask_R"))
+        dnatR = dnat.astype(np.uint8).copy() # keep for screenshot
 
         print(" Hippocampal volumes (L,R)", volsAA_L, volsAA_R)
         scalar_output.append([volsAA_L, volsAA_R])
@@ -759,6 +770,58 @@ def main():
 
     allsubjects_scalar_report.append( (fname, scalar_output_report[0], scalar_output_report[1][0], scalar_output_report[1][1]) )
 
+## resample for screenshot in standard box
+    if any([x.startswith("-thumb") for x in sys.argv[1:]]):
+        print("Preparing screenshots")
+        # papayabox, aka mni4rot_1.1mm.nii.gz.
+        papayabox_affine = np.array([[-1.1, 0., 0., 90.], [-0., 1.1, -0., -146.], [0., 0., 1.1,-152.],[0, 0, 0, 1]])
+        papayabox_shape = (165, 253, 238)
+
+        # our papaya space is 10 degrees titled from MNI space, for space efficiency
+        rot = np.asarray([[1.,0, 0, 0],[0, 0.98481, 0.17365, 0], [0, -0.17365, 0.98481, 0], [0,0,0,1]])
+
+        # coord in mm bbox
+        gsx, gsy, gsz = papayabox_shape
+        sgrid = np.rollaxis(indices_unitary((gsx,gsy,gsz), dtype=np.float32),0,4)
+
+        MIrigid = inv(M).copy()
+        u, s, vt = np.linalg.svd(MIrigid[:3,:3])
+        MIrigid[:3,:3] = u @ vt
+
+        bboxnat = bbox_world(papayabox_affine, papayabox_shape) @ rot.T @ MIrigid.T @ wnat
+        matzoom = np.linalg.lstsq(bbox_one, bboxnat, rcond=None)[0] # in -1..1 space
+        # wgridt for hippo box
+        wgridt = torch.tensor(mul_homo( sgrid, (matzoom @ revaff1i) )[None,...,[2,1,0]], device=device, dtype=torch.float32)
+        del sgrid
+        d = img.get_fdata(caching="unchanged", dtype=np.float32)
+        while len(d.shape) > 3:
+            d = d[...,-1]
+
+        if d.min() < 0:
+            d -= d.min() # workaround some strange behavior in grid_sample
+        dout = F.grid_sample(torch.as_tensor(d, dtype=torch.float32, device=device)[None,None], wgridt, align_corners=True)
+        dres = np.asarray(dout[0,0].cpu())
+        dres = np.clip((dres * (255. / dres.max())), 0, 255).astype(np.uint8)
+        rigid_fname = outfilename.replace("_tiv", "_papaya")
+        nibabel.Nifti1Image(dres, papayabox_affine).to_filename(rigid_fname)
+
+        # Remake in native space just for screenshot
+        wdata = np.zeros(img.shape[:3], np.uint8)
+
+        wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnatL + dnatR
+        dscreen = F.grid_sample(torch.as_tensor(wdata, dtype=torch.float32, device=device)[None,None], wgridt, align_corners=True)
+        dscreen[dscreen < 32] = 0 # remove noise
+        nibabel.Nifti1Image(np.asarray(dscreen.to(torch.uint8)[0,0]),   papayabox_affine).to_filename(outfilename.replace("_tiv", "_papaya_mask_LR"))
+
+    if any([x for x in sys.argv[1:] if x in [ "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg"]]  ):
+        print("Generating thumbnails")
+        render_options = [x for x in sys.argv[1:] if x in [ "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg"]]
+        screenshot_circle.generate_images(outfilename.replace("_tiv", "_papaya"), rendering_mode = [x.replace("-thumb-","") for x in render_options])
+        os.remove( outfilename.replace("_tiv", "_papaya"))
+        os.remove( outfilename.replace("_tiv", "_papaya_mask_LR"))
+        
+
+
   try:
     print("Peak memory used (Gb) " + str(resource.getrusage(resource.RUSAGE_SELF)[2] / (1024.*1024)))
   except:
@@ -766,7 +829,7 @@ def main():
 
   print("Done")
 
-  if len(set(sys.argv[1:]).difference(["-mra", "-mra-head", "-out-regmat"])) > 1:
+  if len(set(sys.argv[1:]).difference(["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg"])) > 1:
     fname = [x for x in sys.argv[1:] if not x.startswith("-mra")][-1]
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
     txt_entries = ["%s,%4.0f,%4.0f,%4.0f\n" % s for s in allsubjects_scalar_report]

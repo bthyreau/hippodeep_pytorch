@@ -6,7 +6,8 @@ description="quick segmentation of the hippocampus from T1 MRI images"
 dependencies = [
   "torch",
   "nibabel",
-  "scipy"
+  "scipy",
+  "matplotlib"
 ]
 
 [python.pip]
