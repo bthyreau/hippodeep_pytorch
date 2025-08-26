@@ -375,7 +375,7 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
-    if fname in ["-mra", "-mra-head"]:
+    if fname in ["-mra", "-mra-head", "-out-regmat"]:
         continue
     if "_mask" in fname:
         print("Skipping %s because the filename contains _mask in it" % fname)
@@ -547,14 +547,14 @@ def main():
     MI = inv(M) * f3
     txt = """#Insight Transform File V1.0\nTransform: AffineTransform_float_3_3\nFixedParameters: 0 0 0\nParameters: """
     txt += " ".join(["%4.6f %4.6f %4.6f" % tuple(x) for x in MI[:3,:3].tolist()]) + " %4.6f %4.6f %4.6f\n" % (MI[0,3], MI[1,3], MI[2,3])
-    if 0:
+    if ("-out-regmat" in sys.argv):
         open(outfilename.replace("_tiv.nii.gz", "_mni0Affine.txt"), "w").write(txt)
 
     u, s, vt = np.linalg.svd(MI[:3,:3])
     MI3rigid = u @ vt
     txt = """#Insight Transform File V1.0\nTransform: AffineTransform_float_3_3\nFixedParameters: 0 0 0\nParameters: """
     txt += " ".join(["%4.6f %4.6f %4.6f" % tuple(x) for x in MI3rigid.tolist()]) + " %4.6f %4.6f %4.6f\n" % (MI[0,3], MI[1,3], MI[2,3])
-    if 0:
+    if ("-out-regmat" in sys.argv):
         open(outfilename.replace("_tiv.nii.gz", "_mni0Rigid.txt"), "w").write(txt)
 
 ## Hippodeep
@@ -766,7 +766,7 @@ def main():
 
   print("Done")
 
-  if len(sys.argv[1:]) > 1:
+  if len(set(sys.argv[1:]).difference(["-mra", "-mra-head", "-out-regmat"])) > 1:
     fname = [x for x in sys.argv[1:] if not x.startswith("-mra")][-1]
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
     txt_entries = ["%s,%4.0f,%4.0f,%4.0f\n" % s for s in allsubjects_scalar_report]
