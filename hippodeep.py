@@ -25,9 +25,14 @@ if len(sys.argv[1:]) == 0:
     print("""Options:
     -mra : use the MRA Angiography model
     -mra-head : in MRA mode, only segments the hippocampal head
+
     -thumb-plain      : Generates some pictures with black background
     -thumb-circle-jpg :      ... with circle + white background
-    -thumb-circle-png :      ... with circle + transparent background """)
+    -thumb-circle-png :      ... with circle + transparent background 
+
+    -qform-save: export a copy of the input without sform, for convenience since hippodeep ignores
+                 the sform (realignment space matrix). Useful to handle pre-processed input
+          """)
 
     sys.exit(1)
 
@@ -384,7 +389,7 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
-    if fname in ["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg"]:
+    if fname in ["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg", "-qform-save"]:
         continue
     if "_mask" in fname:
         print("Skipping %s because the filename contains _mask in it" % fname)
@@ -409,6 +414,8 @@ def main():
             if not np.allclose(img.get_sform(), img.get_qform()):
                 img._affine = img.get_qform() # simplify later ANTs compatibility
                 print("This image has an sform defined, ignoring it - work in scanner space using the qform")
+                if ("-qform-save" in sys.argv):
+                    img.to_filename(outfilename.replace("_tiv.nii.gz", "_qform-save.nii.gz"))
 
     except:
         open(fname + ".warning.txt", "a").write("can't open the file\n")
