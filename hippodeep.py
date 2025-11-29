@@ -37,7 +37,7 @@ if len(sys.argv[1:]) == 0:
     sys.exit(1)
 
 print("Using all available CPU threads")
-if 0: # otherwise, set a limit (useful for running multiple instances)
+if 1: # otherwise, set a limit (useful for running multiple instances)
     torch.set_num_threads(4)
 
 if any([x.startswith("-thumb") for x in sys.argv[1:]]):
@@ -389,7 +389,7 @@ def indices_unitary(dimensions, dtype):
 
 def main():
   for fname in sys.argv[1:]:
-    if fname in ["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg", "-qform-save"]:
+    if fname in ["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg", "-qform-save", "-skip-hippo"]:
         continue
     if "_mask" in fname:
         print("Skipping %s because the filename contains _mask in it" % fname)
@@ -573,6 +573,8 @@ def main():
     if ("-out-regmat" in sys.argv):
         open(outfilename.replace("_tiv.nii.gz", "_mni0Rigid.txt"), "w").write(txt)
 
+    if ("-skip-hippo" in sys.argv):
+        continue
 ## Hippodeep
     T = time.time()
 
@@ -836,7 +838,7 @@ def main():
 
   print("Done")
 
-  if len(set(sys.argv[1:]).difference(["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg"])) > 1:
+  if len(set(sys.argv[1:]).difference(["-mra", "-mra-head", "-out-regmat", "-thumb-plain", "-thumb-circle-png", "-thumb-circle-jpg", "-skip-hippo"])) > 1:
     fname = [x for x in sys.argv[1:] if not x.startswith("-mra")][-1]
     outfilename = (os.path.dirname(fname) or ".") + "/all_subjects_hippo_report.csv"
     txt_entries = ["%s,%4.0f,%4.0f,%4.0f\n" % s for s in allsubjects_scalar_report]
