@@ -714,6 +714,7 @@ def main():
         wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnat.astype(np.uint8)
         nibabel.Nifti1Image(wdata.astype("uint8"), img.affine).to_filename(outfilename.replace("_tiv", f"_mask_L"))
         dnatL = dnat.astype(np.uint8).copy() # keep for screenshot
+        pminL, pwidthL = pmin, pwidth
 
     if ("-mra" in sys.argv):
         imgcroproi_affine = np.array([[ -0.75, 0., 0.,  54.  ], [0., 0.75, 0., -51.], [ 0., 0., 0.75, -45. ], [ 0., 0.,  0., 1. ]])
@@ -817,7 +818,9 @@ def main():
         # Remake in native space just for screenshot
         wdata = np.zeros(img.shape[:3], np.uint8)
 
-        wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnatL + dnatR
+        wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] = dnatR
+        pmin,pwidth = pminL, pwidthL
+        wdata[pmin[0]:pmin[0]+pwidth[0], pmin[1]:pmin[1]+pwidth[1], pmin[2]:pmin[2]+pwidth[2]] += dnatL 
         dscreen = F.grid_sample(torch.as_tensor(wdata, dtype=torch.float32, device=device)[None,None], wgridt, align_corners=True)
         dscreen[dscreen < 32] = 0 # remove noise
         nibabel.Nifti1Image(np.asarray(dscreen.to(torch.uint8)[0,0]),   papayabox_affine).to_filename(outfilename.replace("_tiv", "_papaya_mask_LR"))
